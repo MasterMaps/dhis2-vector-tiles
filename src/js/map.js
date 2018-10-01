@@ -7,7 +7,7 @@ const serverTiles = 'http://localhost:5001/';
 const username = 'admin';
 const password = 'district';
 
-const eventsCount = 20000;
+const truncationCount = 20000;
 
 const map = new mapboxgl.Map({
     container: 'map',
@@ -189,7 +189,7 @@ const getData = async (request) => (
         response.json()
     )).then(json => ({
         "type": "FeatureCollection",
-        features: json.rows.slice(0, eventsCount).map(row => ({
+        features: json.rows.map(row => ({
             type: 'Feature',
             id: row[0],
             properties: json.headers.reduce((o, h, i) => ({
@@ -262,13 +262,14 @@ const createClusters = async () => {
 };
 
 const createHeatmap = async () => {
-    const data = await eventDataPromise.then(geojson => ({
-        ...geojson,
-        features: geojson.features.slice(0, eventsCount),
-    }));
+    const data = await eventDataPromise;
+    const truncatedData = {
+        ...data,
+        features: data.features.slice(0, truncationCount),
+    };
     map.addSource('events-truncated', {
         type: 'geojson',
-        data
+        data: truncatedData,
     });
     map.addLayer({
         "id": "heatmap",
@@ -372,7 +373,7 @@ const createPoints = async () => {
 
 const layerGroups = [
     {
-        name: 'Server OrgUnits',
+        name: 'Org Units',
         layers: [
             'sierraleone-districts',
             'sierraleone-chiefdoms',
