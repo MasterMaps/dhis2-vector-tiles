@@ -15,13 +15,14 @@ const map = new mapboxgl.Map({
 map.fitBounds([[ -13.1899707, 7.009718 ], [ -10.4107857, 9.860312 ]]);
 
 const addVectorLayers = () => {
+    map.addSource('orgUnits', {
+        type: 'vector',
+        tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`],
+    });
     map.addLayer({
         "id": "sierraleone-facilities",
         "type": "circle",
-        "source": {
-            type: 'vector',
-            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
-        },
+        "source": 'orgUnits',
         "source-layer": "facility",
         // "layout": {
         //     "line-join": "round",
@@ -36,10 +37,7 @@ const addVectorLayers = () => {
     map.addLayer({
         "id": "sierraleone-chiefdoms",
         "type": "line",
-        "source": {
-            type: 'vector',
-            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
-        },
+        "source": 'orgUnits',
         "source-layer": "chiefdom",
         // "layout": {
         //     "line-join": "round",
@@ -53,10 +51,7 @@ const addVectorLayers = () => {
     map.addLayer({
         "id": "sierraleone-districts",
         "type": "line",
-        "source": {
-            type: 'vector',
-            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
-        },
+        "source": 'orgUnits',
         "source-layer": "district",
         // "layout": {
         //     "line-join": "round",
