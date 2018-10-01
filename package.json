@@ -1,0 +1,7 @@
+{
+    "name": "dhis2-vector-tiles",
+    "description": "Testing vector tiles for DHIS2",
+    "version": "0.0.1",
+    "devDependencies": {
+    }
+  }
