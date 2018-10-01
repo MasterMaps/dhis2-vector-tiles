@@ -2,6 +2,7 @@ mapboxgl.accessToken = 'pk.eyJ1IjoibWFzdGVybWFwcyIsImEiOiJjaXdiYnZlaDgwMDNuMnZuc
 
 const analyticsApi = 'http://localhost:8080/api/2.30/api/30/analytics/';
 const malariaEvents = 'events/query/VBqh0ynB2wv.json?dimension=ou:ImspTQPwCqd&stage=pTo4uMt3xur&coordinatesOnly=true&startDate=2017-10-01&endDate=2018-10-01';
+const serverTiles = 'http://localhost:5001/';
 
 const username = 'admin';
 const password = 'district';
@@ -12,6 +13,61 @@ const map = new mapboxgl.Map({
 });
 
 map.fitBounds([[ -13.1899707, 7.009718 ], [ -10.4107857, 9.860312 ]]);
+
+const addVectorLayers = () => {
+    map.addLayer({
+        "id": "sierraleone-facilities",
+        "type": "circle",
+        "source": {
+            type: 'vector',
+            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
+        },
+        "source-layer": "facility",
+        // "layout": {
+        //     "line-join": "round",
+        //     "line-cap": "round"
+        // },
+        "paint": {
+            "circle-color": "#0000FF",
+            "circle-radius": 4,
+            "circle-blur": 1,
+        }
+    });
+    map.addLayer({
+        "id": "sierraleone-chiefdoms",
+        "type": "line",
+        "source": {
+            type: 'vector',
+            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
+        },
+        "source-layer": "chiefdom",
+        // "layout": {
+        //     "line-join": "round",
+        //     "line-cap": "round"
+        // },
+        "paint": {
+            "line-color": "#00FF00",
+            "line-width": 1
+        }
+    });
+    map.addLayer({
+        "id": "sierraleone-districts",
+        "type": "line",
+        "source": {
+            type: 'vector',
+            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
+        },
+        "source-layer": "district",
+        // "layout": {
+        //     "line-join": "round",
+        //     "line-cap": "round"
+        // },
+        "paint": {
+            "line-color": "#FF0000",
+            "line-width": 2
+        }
+    });
+};
 
 const getData = async (request) => 
     // await fetch(`${analyticsApi}${request}`, {
@@ -97,94 +153,8 @@ const init = async () => {
     const data = await getData(malariaEvents);
     const geoJson = toGeoJson(data.rows);
 
-
-    // const features = toGeoJson(data.rows.slice(0, 10));
-    // console.log('add data');
-
-    /*
-    map.addSource('events', { 
-        type: 'geojson', 
-        data: toGeoJson(data.rows),
-    });
-    */
-
-    console.log('added');
-
+    addVectorLayers();
     createClusters(geoJson);
-
-    /*
-    map.addLayer({
-        "id": "events-heat",
-        "type": "heatmap",
-        "source": "events",
-        "maxzoom": 18,
-        "paint": {
-            // Increase the heatmap weight based on frequency and property magnitude
-            // "heatmap-weight": [
-            //    "interpolate",
-            //    ["linear"],
-            //    ["get", "mag"],
-            //    0, 0,
-            //    6, 1
-            // ],
-            // Increase the heatmap color weight weight by zoom level
-            // heatmap-intensity is a multiplier on top of heatmap-weight
-            "heatmap-intensity": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                0, 1,
-                9, 3
-            ],
-            // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
-            // Begin color ramp at 0-stop with a 0-transparancy color
-            // to create a blur-like effect.
-            "heatmap-color": [
-                "interpolate",
-                ["linear"],
-                ["heatmap-density"],
-                0, "rgba(33,102,172,0)",
-                0.2, "rgb(103,169,207)",
-                0.4, "rgb(209,229,240)",
-                0.6, "rgb(253,219,199)",
-                0.8, "rgb(239,138,98)",
-                1, "rgb(178,24,43)"
-            ],
-            // Adjust the heatmap radius by zoom level
-            "heatmap-radius": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                0, 2,
-                9, 20
-            ],
-            // Transition from heatmap to circle layer by zoom level
-            "heatmap-opacity": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                7, 1,
-                9, 0
-            ],
-        }
-    }, 'waterway-label');
-    */
-    
-    /*
-    map.addLayer({
-        "id": "events-point",
-        "type": "circle",
-        "source": "events",
-        "minzoom": 6,
-        "paint": {
-            "circle-radius": 4,
-            "circle-color": 'red',
-            // "circle-stroke-color": "white",
-            // "circle-stroke-width": 1,
-            "circle-opacity": 0.1
-        }
-    });
-    */
 
 }
 
