@@ -9,11 +9,6 @@ const password = 'district';
 
 const eventsCount = 20000;
 
-let eventsBtn;
-let eventsRemoveHandler;
-let eventsData;
-let eventsDataReduced;
-
 const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v9'
@@ -183,23 +178,39 @@ const addServerVectorLayers = () => {
     });
 };
 
-const getData = async (request) => 
+const getData = async (request) => (
     // await fetch(`${analyticsApi}${request}`, {
     await fetch('data/malaria-events.json', {
         header: {
             'Content-Type': 'application/json',
             // 'Authorization': 'Basic ' + btoa(`${username}:${password}`),
         },
-    }).then(response => response.json());
-
+    }).then(response => (
+        response.json()
+    )).then(json => ({
+        "type": "FeatureCollection",
+        features: json.rows.slice(0, eventsCount).map(row => ({
+            type: 'Feature',
+            id: row[0],
+            properties: json.headers.reduce((o, h, i) => ({
+                ...o,
+                h: row[i],
+            }), {}),
+            geometry: {
+                type: 'Point',
+                coordinates: [parseFloat(row[3]), parseFloat(row[4])],
+            }
+        })),
+    }))
+);
+const eventDataPromise = getData();
 
 const createClusters = async () => {
-    const data = await getData(malariaEvents);
-    const geoJson = toGeoJson(data.rows);
+    const data = await eventDataPromise;
 
-    map.addSource('events', { 
+    map.addSource('events-clustered', { 
         type: 'geojson', 
-        data: geoJson,
+        data,
         cluster: true,
         clusterMaxZoom: 14,
         clusterRadius: 50
@@ -208,7 +219,7 @@ const createClusters = async () => {
     map.addLayer({
         id: "clusters",
         type: "circle",
-        source: "events",
+        source: "events-clustered",
         filter: ["has", "point_count"],
         paint: {
             "circle-color": "#51bbd6",
@@ -227,7 +238,7 @@ const createClusters = async () => {
     map.addLayer({
         id: "cluster-count",
         type: "symbol",
-        source: "events",
+        source: "events-clustered",
         filter: ["has", "point_count"],
         layout: {
             "text-field": "{point_count_abbreviated}",
@@ -239,7 +250,7 @@ const createClusters = async () => {
     map.addLayer({
         id: "unclustered-point",
         type: "circle",
-        source: "events",
+        source: "events-clustered",
         filter: ["!", ["has", "point_count"]],
         paint: {
             "circle-color": "#11b4da",
@@ -248,20 +259,21 @@ const createClusters = async () => {
             "circle-stroke-color": "#fff"
         }
     });
-
-    eventsRemoveHandler = removeEventClusters;
 };
 
-createHeatmap = (data) => {
-    map.addSource('events', {
+const createHeatmap = async () => {
+    const data = await eventDataPromise.then(geojson => ({
+        ...geojson,
+        features: geojson.features.slice(0, eventsCount),
+    }));
+    map.addSource('events-truncated', {
         type: 'geojson',
         data
     });
-
     map.addLayer({
-        "id": "events-heat",
+        "id": "heatmap",
         "type": "heatmap",
-        "source": "events",
+        "source": "events-truncated",
         "maxzoom": 12,
         "paint": {
             // Increase the heatmap weight based on frequency and property magnitude
@@ -318,9 +330,9 @@ createHeatmap = (data) => {
     }, 'waterway-label');
 
     map.addLayer({
-        "id": "events-point",
+        "id": "heatmap-points",
         "type": "circle",
-        "source": "events",
+        "source": "events-truncated",
         "minzoom": 9,
         "paint": {
             // Size circle radius by earthquake magnitude and zoom level
@@ -333,24 +345,15 @@ createHeatmap = (data) => {
             "circle-opacity": 1
         }
     }, 'waterway-label');
-
-    eventsRemoveHandler = removeEventHeatmap;
 };
 
-const removeEventHeatmap = () => {
-    map.removeLayer('events-heat');
-    map.removeLayer('events-point');
-    map.removeSource('events');
-};
-
-const addEventPoints = (data) => {
+const createPoints = async () => {
     map.addSource('events', {
         type: 'geojson',
-        data
+        data: await eventDataPromise,
     });
-
     map.addLayer({
-        "id": "events-point",
+        "id": "events-points",
         "type": "circle",
         "source": "events",
         // "minzoom": 10,
@@ -365,32 +368,69 @@ const addEventPoints = (data) => {
             "circle-opacity": 1
         }
     }, 'waterway-label');
-
-    eventsRemoveHandler = removeEventPoints;
 };
 
 const layerGroups = [
     {
-        name: 'Server Heatmap',
+        name: 'Server OrgUnits',
         layers: [
-            'sierraleone-malaria-heatmap',
-            'sierraleone-malaria-pts',
+            'sierraleone-districts',
+            'sierraleone-chiefdoms',
+            'sierraleone-facilities',
         ],
         visible: true,
+        independent: true,
     },
-    {
-        name: 'Client Clusters',
-        layers: [
-            'clusters',
-            'cluster-count',
-            'unclustered-point'
-        ],
-        visible: false,
-    },
+    [
+        {
+            name: 'Server Heatmap',
+            layers: [
+                'sierraleone-malaria-heatmap',
+                'sierraleone-malaria-pts',
+            ],
+            visible: true,
+        },
+        {
+            name: 'Client Clusters',
+            layers: [
+                'clusters',
+                'cluster-count',
+                'unclustered-point'
+            ],
+            visible: false,
+        },
+        {
+            name: 'Client Heatmap (20k)',
+            layers: [
+                'heatmap',
+                'heatmap-points'
+            ],
+            visible: false,
+        },
+        {
+            name: 'Client Points',
+            layers: [
+                'events-points',
+            ],
+            visible: false,
+        },
+    ]
 ];
 
+const allLayerGroups = []
+layerGroups.forEach(group => {
+    if (Array.isArray(group)) {
+        group.forEach(subGroup => {
+            subGroup.metaGroup = group;
+            allLayerGroups.push(subGroup);
+        });
+    } else {
+        allLayerGroups.push(group);
+    }
+});
+
 updateLayerVisibilities = () => {
-    layerGroups.forEach(group => {
+    allLayerGroups.forEach(group => {
         group.layers.forEach(layer => {
             if (!group.visible) {
                 map.setLayoutProperty(layer, 'visibility', 'none');
@@ -401,38 +441,59 @@ updateLayerVisibilities = () => {
     })
 }
 
-function createLayerToggles() {
-    layerGroups.forEach(group => {
-        var link = document.createElement('a');
-        link.href = '#';
-        link.className = group.visible ? 'active' : '';
-        link.textContent = group.name;
+const appendLayerToggle = (group, parentDom) => {
+    var link = document.createElement('a');
+    link.href = '#';
+    link.className = group.visible ? 'active' : '';
+    link.textContent = group.name;
 
-        group.link = link;
+    group.link = link;
 
-        link.onclick = ((group, e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
+    link.onclick = ((group, e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (group.metaGroup) {
             if (!group.visible) {
-                layerGroups.forEach(g => {
+                group.metaGroup.forEach(g => {
                     g.visible = false;
                     g.link.className = '';
-                })
+                });
                 group.visible = true;
-                group.link.className = 'active';
             }
-            updateLayerVisibilities();
-        }).bind(null, group);
+        } else {
+            group.visible = !group.visible;
+        }
 
-        var layers = document.getElementById('menu');
-        layers.appendChild(link);
+        group.link.className = group.visible ? 'active' : '';
+        updateLayerVisibilities();
+    }).bind(null, group);
+
+    parentDom.appendChild(link);
+}
+
+function createLayerToggles() {
+    var layerListDom = document.getElementById('menu');
+    layerGroups.forEach(group => {
+        if (Array.isArray(group)) {
+            const toggleGroupDom = document.createElement('div');
+            toggleGroupDom.className = 'toggleGroup';
+            group.forEach(subGroup => {
+                appendLayerToggle(subGroup, toggleGroupDom);
+            });
+            layerListDom.appendChild(toggleGroupDom);
+        } else {
+            appendLayerToggle(group, layerListDom);
+        }
     });
 }
 
 const init = async () => {
     addServerVectorLayers();
     await createClusters();
+    await createHeatmap();
+    await createPoints();
+
     updateLayerVisibilities();
 }
 
