@@ -148,6 +148,13 @@ const createClusters = (data) => {
 
 };
 
+const clearClusters = () => {
+    map.removerSource('events');
+    map.removeLayer('clusters');
+    map.removeLayer('cluster-count');
+    map.removeLayer('unclustered-point');
+};
+
 const init = async () => {
     console.log('load data');
     const data = await getData(malariaEvents);
