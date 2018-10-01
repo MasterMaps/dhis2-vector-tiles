@@ -7,10 +7,18 @@ const serverTiles = 'http://localhost:5001/';
 const username = 'admin';
 const password = 'district';
 
+const eventsCount = 20000;
+
+let eventsBtn;
+let eventsRemoveHandler;
+let eventsData;
+let eventsDataReduced;
+
 const map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v9'
 });
+
 
 map.fitBounds([[ -13.1899707, 7.009718 ], [ -10.4107857, 9.860312 ]]);
 
@@ -184,18 +192,6 @@ const getData = async (request) =>
         },
     }).then(response => response.json());
 
-const toGeoJson = rows => ({
-    type: 'FeatureCollection',
-    features: rows.map(row => ({
-        type: 'Feature',
-        id: row[0],
-        properties: row,
-        geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(row[3]), parseFloat(row[4])],
-        }
-    })),
-});
 
 const createClusters = async () => {
     const data = await getData(malariaEvents);
@@ -253,6 +249,7 @@ const createClusters = async () => {
         }
     });
 
+    eventsRemoveHandler = removeEventClusters;
 };
 
 createHeatmap = (data) => {
@@ -268,7 +265,7 @@ createHeatmap = (data) => {
         "maxzoom": 12,
         "paint": {
             // Increase the heatmap weight based on frequency and property magnitude
-            "heatmap-weight": 0.2,
+            "heatmap-weight": 0.5,
             /*
             "heatmap-weight": [
                 "interpolate",
@@ -285,7 +282,7 @@ createHeatmap = (data) => {
                 ["linear"],
                 ["zoom"],
                 0, 1,
-                12, 3
+                9, 3
             ],
             // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
             // Begin color ramp at 0-stop with a 0-transparancy color
@@ -315,7 +312,7 @@ createHeatmap = (data) => {
                 ["linear"],
                 ["zoom"],
                 7, 1,
-                12, 1
+                9, 1
             ],
         }
     }, 'waterway-label');
@@ -324,7 +321,39 @@ createHeatmap = (data) => {
         "id": "events-point",
         "type": "circle",
         "source": "events",
-        "minzoom": 10,
+        "minzoom": 9,
+        "paint": {
+            // Size circle radius by earthquake magnitude and zoom level
+            "circle-radius": 4,
+            // Color circle by earthquake magnitude
+            "circle-color": 'rgb(178,24,43)',
+            "circle-stroke-color": "white",
+            "circle-stroke-width": 1,
+            // Transition from heatmap to circle layer by zoom level
+            "circle-opacity": 1
+        }
+    }, 'waterway-label');
+
+    eventsRemoveHandler = removeEventHeatmap;
+};
+
+const removeEventHeatmap = () => {
+    map.removeLayer('events-heat');
+    map.removeLayer('events-point');
+    map.removeSource('events');
+};
+
+const addEventPoints = (data) => {
+    map.addSource('events', {
+        type: 'geojson',
+        data
+    });
+
+    map.addLayer({
+        "id": "events-point",
+        "type": "circle",
+        "source": "events",
+        // "minzoom": 10,
         "paint": {
             // Size circle radius by earthquake magnitude and zoom level
             "circle-radius": 4,
@@ -337,7 +366,7 @@ createHeatmap = (data) => {
         }
     }, 'waterway-label');
 
-    console.log('heatmap');
+    eventsRemoveHandler = removeEventPoints;
 };
 
 const layerGroups = [
