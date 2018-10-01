@@ -14,7 +14,7 @@ const map = new mapboxgl.Map({
 
 map.fitBounds([[ -13.1899707, 7.009718 ], [ -10.4107857, 9.860312 ]]);
 
-const addVectorLayers = () => {
+const addServerVectorLayers = () => {
     map.addSource('orgUnits', {
         type: 'vector',
         tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`],
@@ -109,7 +109,6 @@ const addVectorLayers = () => {
                 ["linear"],
                 ["zoom"],
                 7, 0,
-                9, 0,
                 14, 1
             ],
             "circle-stroke-opacity": [
@@ -117,7 +116,6 @@ const addVectorLayers = () => {
                 ["linear"],
                 ["zoom"],
                 7, 0,
-                9, 0,
                 14, 1
             ]
         }
@@ -257,58 +255,157 @@ const createClusters = async () => {
 
 };
 
-const init = async () => {
-    addVectorLayers();
-    await createClusters();
-}
+createHeatmap = (data) => {
+    map.addSource('events', {
+        type: 'geojson',
+        data
+    });
 
-map.on('load', init);
+    map.addLayer({
+        "id": "events-heat",
+        "type": "heatmap",
+        "source": "events",
+        "maxzoom": 12,
+        "paint": {
+            // Increase the heatmap weight based on frequency and property magnitude
+            "heatmap-weight": 0.2,
+            /*
+            "heatmap-weight": [
+                "interpolate",
+                ["linear"],
+                ["get", "mag"],
+                0, 0,
+                6, 1
+            ],
+            */
+            // Increase the heatmap color weight weight by zoom level
+            // heatmap-intensity is a multiplier on top of heatmap-weight
+            "heatmap-intensity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0, 1,
+                12, 3
+            ],
+            // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
+            // Begin color ramp at 0-stop with a 0-transparancy color
+            // to create a blur-like effect.
+            "heatmap-color": [
+                "interpolate",
+                ["linear"],
+                ["heatmap-density"],
+                0, "rgba(33,102,172,0)",
+                0.2, "rgb(103,169,207)",
+                0.4, "rgb(209,229,240)",
+                0.6, "rgb(253,219,199)",
+                0.8, "rgb(239,138,98)",
+                1, "rgb(178,24,43)"
+            ],
+            // Adjust the heatmap radius by zoom level
+            "heatmap-radius": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0, 1,
+                12, 10
+            ],
+            // Transition from heatmap to circle layer by zoom level
+            "heatmap-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                7, 1,
+                12, 1
+            ],
+        }
+    }, 'waterway-label');
 
-function createLayerToggles() {
-    var toggleableLayerGroups = {
-        'Server Heatmap': [
-           'sierraleone-malaria-heatmap',
-           'sierraleone-malaria-pts', 
+    map.addLayer({
+        "id": "events-point",
+        "type": "circle",
+        "source": "events",
+        "minzoom": 10,
+        "paint": {
+            // Size circle radius by earthquake magnitude and zoom level
+            "circle-radius": 4,
+            // Color circle by earthquake magnitude
+            "circle-color": 'red',
+            "circle-stroke-color": "white",
+            "circle-stroke-width": 1,
+            // Transition from heatmap to circle layer by zoom level
+            "circle-opacity": 1
+        }
+    }, 'waterway-label');
+
+    console.log('heatmap');
+};
+
+const layerGroups = [
+    {
+        name: 'Server Heatmap',
+        layers: [
+            'sierraleone-malaria-heatmap',
+            'sierraleone-malaria-pts',
         ],
-        'Client Clusters': [
+        visible: true,
+    },
+    {
+        name: 'Client Clusters',
+        layers: [
             'clusters',
             'cluster-count',
             'unclustered-point'
-        ]
-    };
+        ],
+        visible: false,
+    },
+];
 
-    var groups = Object.keys(toggleableLayerGroups);
-    for (var i = 0; i < groups.length; i++) {
-        var name = groups[i];
+updateLayerVisibilities = () => {
+    layerGroups.forEach(group => {
+        group.layers.forEach(layer => {
+            if (!group.visible) {
+                map.setLayoutProperty(layer, 'visibility', 'none');
+            } else {
+                map.setLayoutProperty(layer, 'visibility', 'visible');
+            }
+        })
+    })
+}
 
+function createLayerToggles() {
+    layerGroups.forEach(group => {
         var link = document.createElement('a');
         link.href = '#';
-        link.className = 'active';
-        link.textContent = name;
+        link.className = group.visible ? 'active' : '';
+        link.textContent = group.name;
 
-        var themap = map;
-        link.onclick = function (e) {
-            var ids = toggleableLayerGroups[this.textContent];
+        group.link = link;
+
+        link.onclick = ((group, e) => {
             e.preventDefault();
             e.stopPropagation();
-
-            for (var i = 0; i < ids.length; ++i) {
-                const id = ids[i];
-                var visibility = themap.getLayoutProperty(id, 'visibility');
-
-                if (visibility === 'visible') {
-                    themap.setLayoutProperty(id, 'visibility', 'none');
-                    this.className = '';
-                } else {
-                    this.className = 'active';
-                    themap.setLayoutProperty(id, 'visibility', 'visible');
-                }
+            
+            if (!group.visible) {
+                layerGroups.forEach(g => {
+                    g.visible = false;
+                    g.link.className = '';
+                })
+                group.visible = true;
+                group.link.className = 'active';
             }
-        };
+            updateLayerVisibilities();
+        }).bind(null, group);
 
         var layers = document.getElementById('menu');
         layers.appendChild(link);
-    }
+    });
 }
 
+const init = async () => {
+    addServerVectorLayers();
+    await createClusters();
+    updateLayerVisibilities();
+}
+
+map.on('load', init);
 createLayerToggles();
