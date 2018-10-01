@@ -14,14 +14,27 @@ const map = new mapboxgl.Map({
 
 map.fitBounds([[ -13.1899707, 7.009718 ], [ -10.4107857, 9.860312 ]]);
 
+const toggleVectorLayers = (evt) => {
+    const btn = evt.target;
+    btn.classList.toggle('selected');
+
+    if (btn.className === 'selected') {
+        addVectorLayers();
+    } else {
+        removeVectorLayers();
+    }
+}
+
 const addVectorLayers = () => {
+    map.addSource('sierraleone-orgunits', {
+        type: 'vector',
+        tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
+    });
+
     map.addLayer({
         "id": "sierraleone-facilities",
         "type": "circle",
-        "source": {
-            type: 'vector',
-            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
-        },
+        "source": "sierraleone-orgunits",
         "source-layer": "facility",
         // "layout": {
         //     "line-join": "round",
@@ -36,10 +49,7 @@ const addVectorLayers = () => {
     map.addLayer({
         "id": "sierraleone-chiefdoms",
         "type": "line",
-        "source": {
-            type: 'vector',
-            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
-        },
+        "source": "sierraleone-orgunits",
         "source-layer": "chiefdom",
         // "layout": {
         //     "line-join": "round",
@@ -53,10 +63,7 @@ const addVectorLayers = () => {
     map.addLayer({
         "id": "sierraleone-districts",
         "type": "line",
-        "source": {
-            type: 'vector',
-            tiles: [`${serverTiles}sierraleone-orgunits/{z}/{x}/{y}`]
-        },
+        "source": "sierraleone-orgunits",
         "source-layer": "district",
         // "layout": {
         //     "line-join": "round",
@@ -67,6 +74,13 @@ const addVectorLayers = () => {
             "line-width": 2
         }
     });
+};
+
+const removeVectorLayers = () => {
+    map.removeLayer('sierraleone-facilities');
+    map.removeLayer('sierraleone-chiefdoms');
+    map.removeLayer('sierraleone-districts');
+    map.removeSource('sierraleone-orgunits');;
 };
 
 const getData = async (request) => 
@@ -242,10 +256,11 @@ const init = async () => {
     const data = await getData(malariaEvents);
     const geoJson = toGeoJson(data.rows);
 
-    addVectorLayers();
+    // addVectorLayers();
     // createClusters(geoJson);
-    createHeatmap(geoJson);
+    // createHeatmap(geoJson);
 
+    document.getElementById('tiles').addEventListener('click', toggleVectorLayers);
 }
 
 map.on('load', init);
