@@ -1,0 +1,19 @@
+{
+  "name": "dhis2-vector-tile-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Austin McGee",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "mbtiles-server": "^3.1.0"
+  },
+  "scripts": {
+    "start": "babel-node index.js"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.1.2",
+    "@babel/node": "^7.0.0",
+    "babel-preset-env": "^1.7.0"
+  }
+}
